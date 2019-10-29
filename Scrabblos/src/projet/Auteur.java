@@ -1,5 +1,6 @@
 package projet;
 
+import java.awt.image.ConvolveOp;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -44,7 +45,10 @@ public class Auteur implements Runnable{
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
-		//TODO lecture du sac de lettres
+		long taille_ans = inchan.readLong();
+		byte [] cbuf = new byte[(int)taille_ans];
+		inchan.read(cbuf, 0, (int)taille_ans);
+		System.out.println(new String(cbuf,"UTF-8"));
 		return true;
 	}
 	
@@ -55,9 +59,8 @@ public class Auteur implements Runnable{
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.writeUTF(msg);
-		char [] cbuf = new char[256];
-		System.out.println(inchan.readChar());
 		return true;
+		
 	}
 
 	@Override
