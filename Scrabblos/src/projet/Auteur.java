@@ -1,14 +1,19 @@
 package projet;
 
 import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.net.Socket;
+import java.nio.CharBuffer;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+
+import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
 
 import org.json.JSONObject;
 
@@ -16,12 +21,12 @@ import org.json.JSONObject;
 
 public class Auteur implements Runnable{
 	private DataOutputStream outchan;
-	private BufferedReader inchan;
+	private DataInputStream inchan;
 	private Socket socket;
 	private KeyPair pair;
 	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException{
 		socket = s;
-		inchan = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		inchan = new DataInputStream(socket.getInputStream());
 		outchan = new DataOutputStream(s.getOutputStream());
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
@@ -38,8 +43,8 @@ public class Auteur implements Runnable{
 		String msg = obj.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
-		outchan.writeUTF(msg);
-		outchan.flush();
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		//TODO lecture du sac de lettres
 		return true;
 	}
 	
@@ -47,11 +52,11 @@ public class Auteur implements Runnable{
 		JSONObject obj = new JSONObject();
 		obj.put("listen","null");
 		String msg = obj.toString();
-		long taille = msg.length()+1;
+		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.writeUTF(msg);
 		char [] cbuf = new char[256];
-		System.out.println(inchan.read(cbuf));
+		System.out.println(inchan.readChar());
 		return true;
 	}
 
