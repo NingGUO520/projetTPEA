@@ -1,26 +1,25 @@
 package projet;
 
-import java.awt.image.ConvolveOp;
-import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.math.BigInteger;
+import java.io.UnsupportedEncodingException;
 import java.net.Socket;
-import java.nio.CharBuffer;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.Signature;
+import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter;
+import java.util.Random;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 
@@ -31,7 +30,7 @@ public class Auteur implements Runnable{
 	private Socket socket;
 	private KeyPair pair;
 	private ArrayList<String> letters;
-	private int periode;
+	private long periode;
 	private String keyPublic;
 	
 	
@@ -43,10 +42,7 @@ public class Auteur implements Runnable{
 		outchan = new DataOutputStream(s.getOutputStream());
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
-	}
-	
-	long little2big(long i) {
-	    return (i&0xff)<<24 | (i&0xff00)<<8 | (i&0xff0000)>>8 | (i>>24)&0xff;
+		keyPublic = Utils.getHexKey(pair.getPublic());
 	}
 	
 	public void read() throws IOException {
@@ -59,13 +55,7 @@ public class Auteur implements Runnable{
 	}
 	public boolean register() throws IOException, ClassNotFoundException, NoSuchAlgorithmException {
 		JSONObject obj = new JSONObject();
-		String [] key = pair.getPublic().toString().split("\n");
-
-//		keyPublic = "8f7935d9b9aae9bfabed887acf4951b6f32ec59e3baf3718e8eac4961f3efd36";
-		keyPublic = sha256("auteur1");
-//		System.out.println("keyPublic = "+keyPublic);
-		obj.put("register","b7b597e0d64accdb6d8271328c75ad301c29829619f4865d31cc0c550046a08f" );
-//		obj.put("register",keyPublic);
+		obj.put("register",keyPublic);
 		String msg = obj.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
@@ -86,80 +76,37 @@ public class Auteur implements Runnable{
 		return true;
 	}
 	
-	public boolean injectLettre() throws IOException, NoSuchAlgorithmException {
-		JSONObject letter = new JSONObject();
-//		String a = letters.get(3);
-		String a = "a";
-		String head = sha256("");
-		
-		String auteur = "b7b597e0d64accdb6d8271328c75ad301c29829619f4865d31cc0c550046a08f";
-//		System.out.println("head = " +head);
-		String signature = "8b6547447108e11c0092c95e460d70f367bc137d5f89c626642e1e5f2ceb6108043d4a080223b467bb810c52b5975960eea96a2203a877f32bbd6c4dac16ec07";
-	
-//		String signature = sha512(a+periode+head+keyPublic);
-//		System.out.println("signature = " +signature);
-//		System.out.println("periode = " +periode);
-
-		letter.put("letter", a);
-		letter.put("period", periode);
-		letter.put("head", head);
-		letter.put("author", auteur);
-		letter.put("signature", signature);
-		
-		
-		JSONObject obj = new JSONObject();
-		obj.put("inject_letter", letter);
-		
-//		obj.put("inject_letter", "{ \"letter\":\"a\", \"period\":0,\n" + 
-//				"     \"head\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n" + 
-//				"     \"author\":\"b7b597e0d64accdb6d8271328c75ad301c29829619f4865d31cc0c550046a08f\",\n" + 
-//				"     \"signature\":\"8b6547447108e11c0092c95e460d70f367bc137d5f89c626642e1e5f2ceb6108043d4a080223b467bb810c52b5975960eea96a2203a877f32bbd6c4dac16ec07\"\n" + 
-//				"   }\n" + 
-//				"");
-
-		
-		String msg = obj.toString();
+	public boolean injectLetter() throws InvalidKeyException, JSONException, NoSuchAlgorithmException, SignatureException, IOException {
+		JSONObject injection = new JSONObject();
+		injection.put("inject_letter", getLetter());
+		String msg = injection.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
-		
-		periode++;
 		return true;
 	}
 	
-	
-	public String bytesToHex(byte[] bytes) {
-		StringBuilder sb = new StringBuilder();
-		for(Byte b : bytes) {
-			sb.append(String.format("%02x", b));
-			
-		}
-		return sb.toString();
+	public JSONObject getLetter() throws NoSuchAlgorithmException, InvalidKeyException, JSONException, SignatureException, UnsupportedEncodingException {
+		Random rd = new Random();
+		int index = rd.nextInt(letters.size());
+		String l = letters.remove(index);
+		JSONObject lettre = new JSONObject();
+		lettre.put("letter", l);
+		lettre.put("period", periode);
+		lettre.put("head", Utils.hash(""));
+		lettre.put("author", keyPublic);
+		String s = Utils.hash(Utils.toBinaryString(l)+Long.toBinaryString(periode)+Utils.hash("")+keyPublic);
+		lettre.put("signature", signMessage(s));
+		return lettre;
 	}
 	
-	public String hash256(String s) throws NoSuchAlgorithmException {
-		MessageDigest md = MessageDigest.getInstance("SHA-256");
-		byte[] resultat = md.digest(s.getBytes());
-		
-		return bytesToHex(resultat);
+	public String signMessage(String message) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException, UnsupportedEncodingException {
+		Signature s = Signature.getInstance("SHA256withDSA");
+		s.initSign(pair.getPrivate());
+		s.update(message.getBytes());
+		String signature = Utils.bytesToHex(s.sign());
+		return signature;
 	}
-	
-	
-	public String hash512(String s) throws NoSuchAlgorithmException {
-		MessageDigest md = MessageDigest.getInstance("SHA-512");
-		byte[] resultat = md.digest(s.getBytes());
-		
-		return bytesToHex(resultat);
-	}
-	
-	
-	public  String sha256(String base) throws NoSuchAlgorithmException {
-	   return hash256(base);
-	}
-	
-	public  String sha512(String base) throws NoSuchAlgorithmException {
-		   return hash512(base);
-		}
 	
 	public boolean ecouteContinue() throws IOException {
 		JSONObject obj = new JSONObject();
@@ -204,13 +151,9 @@ public class Auteur implements Runnable{
 		try {
 				
 				register();
-				System.out.println("fin de registration");
-				injectLettre();
-				System.out.println("fin de envoyer de lettre");
-//				ecouteContinue();
-//
+				injectLetter();
 				getFullLetterPool();
-				getLetterPoolSince(0);
+				ecouteContinue();
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -219,6 +162,15 @@ public class Auteur implements Runnable{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (SignatureException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 

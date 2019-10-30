@@ -13,12 +13,6 @@ public class MainTest {
 		
 		Thread t = new Thread(aut);
 		t.start();
-//		aut.ecouteContinue();
-//		aut.register();
-//		aut.injectLettre();
-//		aut.getFullLetterPool();
-//		aut.getLetterPoolSince(0);
-		
 //		
 	
 //		
