@@ -6,17 +6,12 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.SignatureException;
-import java.security.spec.InvalidKeySpecException;
 
 import org.json.JSONException;
 
 public class MainTest {
 	public static void main (String [] args) throws IOException, NoSuchAlgorithmException, InterruptedException, ClassNotFoundException, InvalidKeyException, JSONException, SignatureException, NoSuchProviderException {
 
-		
-		
-		
-		
 		Socket s = new Socket("127.0.0.1", 12345);
 		Auteur aut = new Auteur(s);
 		Thread t = new Thread(aut);
@@ -37,6 +32,15 @@ public class MainTest {
 		Thread t1 = new Thread(pol);
 		t1.start();
 	
+		
+		while(true) {
+			Thread.sleep(1000);
+			aut.injectLetter();
+			Thread.sleep(100);
+			aut2.injectLetter();
+			Thread.sleep(100);
+			aut3.injectLetter();
+		}
 
 	}
 }

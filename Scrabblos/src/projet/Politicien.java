@@ -13,11 +13,7 @@ import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.json.JSONArray;
@@ -35,7 +31,7 @@ public class Politicien implements Runnable{
 	private String keyPublic;
 	private List<Letter> letters;
 	private List<String> allWords;
-	private Set<String> guessWords;
+	private List<Word> guessWords;
 	
 	public Politicien(String url, int port) throws IOException, NoSuchAlgorithmException {
 		socket = new Socket(url, port);
@@ -43,7 +39,7 @@ public class Politicien implements Runnable{
 		outchan = new DataOutputStream(socket.getOutputStream());
 		id = ++politicienNumber;
 		letters = new ArrayList<Letter>();
-		guessWords = new HashSet<String>();
+		guessWords = new ArrayList<Word>();
 		allWords = Utils.readFile("dict/dict_100000_1_10.txt");
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
@@ -52,7 +48,7 @@ public class Politicien implements Runnable{
         System.out.println("------------------------");
 	}
 	
-	public boolean initialzeLetters() throws IOException, JSONException {
+	public synchronized boolean initialzeLetters() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_letterpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -63,14 +59,15 @@ public class Politicien implements Runnable{
 		JSONObject object = new JSONObject(s);
 		JSONObject full_letterpool  =  (JSONObject) object.get("full_letterpool");
 		JSONArray array  =  (JSONArray) full_letterpool.get("letters");
+		letters.removeAll(letters);
 		for(int i = 0; i<array.length();i++){
 			letters.add(new Letter(array.get(i).toString().substring(3, array.get(i).toString().length()-1)));
 		}
-		System.out.println(letters);
+		System.out.println("Les lettres injectees "+letters);
 		return true;
 	}
 	
-	public boolean initialzeWords() throws IOException, JSONException {
+	public synchronized boolean initialzeWords() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_wordpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -81,14 +78,15 @@ public class Politicien implements Runnable{
 		JSONObject object = new JSONObject(s);
 		JSONObject full_letterpool  =  (JSONObject) object.get("full_wordpool");
 		JSONArray array  =  (JSONArray) full_letterpool.get("words");
+		guessWords.removeAll(guessWords);
 		for(int i = 0; i<array.length();i++){
-			guessWords.add(array.get(i).toString().substring(3, array.get(i).toString().length()-1));
+			guessWords.add(new Word(array.get(i).toString().substring(3, array.get(i).toString().length()-1)));
 		}
-		System.out.println(guessWords);
+		System.out.println("Les mots injectes "+guessWords);
 		return true;
 	}
 	
-	public boolean listen() throws IOException, ClassNotFoundException, NoSuchAlgorithmException, JSONException {
+	public boolean listen() throws IOException, ClassNotFoundException, NoSuchAlgorithmException, JSONException, InvalidKeyException, SignatureException, InterruptedException {
 		JSONObject obj = new JSONObject();
 		obj.put("listen",JSONObject.NULL);
 		String msg = obj.toString();
@@ -96,23 +94,28 @@ public class Politicien implements Runnable{
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
 		String s = read();
+		initialzeLetters();
+		initialzeWords();
+		Thread.sleep(1000);
+		injectWord();
 		return true;
 	}
 	
 	public List<String> checkWordIfExist(){
-		return allWords.stream().filter(guessWords::contains).filter(word -> check(word)).collect(Collectors.toList());
+		List<String> guessWordsAsString = Word.ListOfWordsToListOfString(guessWords);
+		return allWords.stream().filter(word->!guessWordsAsString.contains(word)).filter(word -> check(word)).collect(Collectors.toList());
 	}
 	
 	public boolean check(String word){
 		List<String> lettre = letters.stream().map(l -> l.letter).collect(Collectors.toList());
-		//todo
-		return Arrays.asList(word.split("")).stream().map(c -> lettre.contains(c)) != null;
+		return Arrays.asList(word.split("")).stream().filter(c -> lettre.contains(c)).count() == Arrays.asList(word.split("")).size();
 	}
 	
-	public boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException {
+	public synchronized boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException {
 		List<String> listOfWords = checkWordIfExist();
 		if(!listOfWords.isEmpty()){
 			System.out.println("inject word");
+			System.out.println(listOfWords);
 			JSONObject injection = new JSONObject();
 			injection.put("inject_word", getWord(listOfWords.get(0)));
 			String msg = injection.toString();
@@ -164,11 +167,16 @@ public class Politicien implements Runnable{
 	@Override
 	public void run() {
 		try {
-			//while(true) {
+			while(true) {
+				Thread.sleep(1000);
 				initialzeLetters();
+				initialzeWords();
 				injectWord();
-			//}
+			}
 		} catch (IOException | InvalidKeyException | NoSuchAlgorithmException | JSONException | SignatureException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
