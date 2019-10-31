@@ -81,13 +81,14 @@ public class Auteur implements Runnable{
 	
 	public boolean injectLetter() throws InvalidKeyException, JSONException, NoSuchAlgorithmException, SignatureException, IOException {
 		JSONObject injection = new JSONObject();
-		injection.put("inject_letter", getLetter());
+		JSONObject letter = getLetter();
+		injection.put("inject_letter", letter);
 		String msg = injection.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
 		
-		bloc = new Bloc(injection, bloc);
+		bloc = new Bloc(letter, bloc);
 		
 		return true;
 	}
@@ -163,6 +164,7 @@ public class Auteur implements Runnable{
 				
 			register();
 			ecouteContinue();
+			injectLetter();
 			injectLetter();
 			while(true) {
 				read();
