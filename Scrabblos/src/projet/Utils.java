@@ -8,6 +8,8 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
@@ -25,6 +27,9 @@ import org.json.JSONObject;
 
 public class Utils {
 	
+	
+	
+	
 	public static List<String> readFile(String file) throws IOException{
         InputStream ips  =  new FileInputStream(file);
         InputStreamReader ir = new InputStreamReader(ips);
@@ -38,11 +43,12 @@ public class Utils {
     }
 	
 	public static String getHexKey(PublicKey pk) {
-		byte [] array = pk.getEncoded();
+		byte [] array = pk.toString().getBytes();
 		Encoder encoder = Base64.getEncoder();
 		String s = encoder.encodeToString(array);
 		byte[] decoded = Base64.getDecoder().decode(s);
-		return String.format("%040x", new BigInteger(1, decoded)).substring(0, 64);
+		String res = String.format("%040x", new BigInteger(1, decoded));
+		return res.substring(res.length()-64, res.length());
 	}
 	
 	private static byte[] getSHA(String input) throws NoSuchAlgorithmException 

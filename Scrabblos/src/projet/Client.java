@@ -6,12 +6,13 @@ import java.io.OutputStreamWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Client {
 	
 	Socket s ;
-	public void connexion() {
+	public void connexion() throws JSONException {
 
 		JSONObject object = new JSONObject();
 		object.put("lettre", 'A');
@@ -42,7 +43,7 @@ public class Client {
 		return null;
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws JSONException {
 
 		Client client = new Client();
 		client.connexion();

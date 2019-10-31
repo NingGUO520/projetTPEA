@@ -9,10 +9,11 @@ import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
 
 import org.json.JSONArray;
@@ -31,28 +32,32 @@ public class Auteur implements Runnable{
 	private String keyPublic;
 	private static int authorNumber=0;
 	private int id;
+	private Bloc bloc;
 	
-	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException{
+	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException, NoSuchProviderException{
 		periode = 0;
 		letters = new ArrayList<String>();
 		socket = s;
 		inchan = new DataInputStream(socket.getInputStream());
 		outchan = new DataOutputStream(s.getOutputStream());
-		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
+		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA","SUN");
+		kp.initialize(1024, SecureRandom.getInstance("SHA1PRNG", "SUN"));
 		pair = kp.generateKeyPair();
 		keyPublic = Utils.getHexKey(pair.getPublic());
+		bloc = new Bloc();
 		id = ++authorNumber;
 	}
 	
-	public void read() throws IOException {
+	public void read() throws IOException, JSONException {
 		long taille_ans = inchan.readLong();
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
 		String s = new String(cbuf,"UTF-8");
 		System.out.println("Author "+id+" receive "+s);
 		
+		
 	}
-	public boolean register() throws IOException, ClassNotFoundException, NoSuchAlgorithmException {
+	public boolean register() throws IOException, ClassNotFoundException, NoSuchAlgorithmException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("register",keyPublic);
 		String msg = obj.toString();
@@ -67,9 +72,8 @@ public class Auteur implements Runnable{
 		
 		JSONObject object = new JSONObject(s);
 		JSONArray array  =  (JSONArray) object.get("letters_bag");
-		List<Object> l = array.toList();
-		for(Object a: l ) {
-			String x = (String)a;
+		for(int i=0;i<array.length();i++) {
+			String x = (String)array.get(i);
 			letters.add(x);
 		}
 		return true;
@@ -82,6 +86,9 @@ public class Auteur implements Runnable{
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		
+		bloc = new Bloc(injection, bloc);
+		
 		return true;
 	}
 	
@@ -92,7 +99,7 @@ public class Auteur implements Runnable{
 		JSONObject lettre = new JSONObject();
 		lettre.put("letter", l);
 		lettre.put("period", periode);
-		lettre.put("head", Utils.hash(""));
+		lettre.put("head", bloc.getHash());
 		lettre.put("author", keyPublic);
 		String s = Utils.hash(Utils.toBinaryString(l)+Long.toBinaryString(periode)+Utils.hash("")+keyPublic);
 		lettre.put("signature", signMessage(s));
@@ -107,7 +114,7 @@ public class Auteur implements Runnable{
 		return signature;
 	}
 	
-	public boolean ecouteContinue() throws IOException {
+	public boolean ecouteContinue() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("listen",JSONObject.NULL);
 		String msg = obj.toString();
@@ -118,7 +125,7 @@ public class Auteur implements Runnable{
 		
 	}
 	
-	public boolean getFullLetterPool() throws IOException {
+	public boolean getFullLetterPool() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_letterpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -131,7 +138,7 @@ public class Auteur implements Runnable{
 	}
 	
 	
-	public boolean getLetterPoolSince(int p) throws IOException {
+	public boolean getLetterPoolSince(int p) throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_letterpool_since",p);
 		String msg = obj.toString();
@@ -143,16 +150,23 @@ public class Auteur implements Runnable{
 		return true;
 	}
 	
+	public void next_turn(JSONObject o) throws InvalidKeyException, JSONException, NoSuchAlgorithmException, SignatureException, IOException {
+		periode = o.getInt("period");
+		injectLetter();
+	}
+	
 	
 
 	@Override
 	public void run() {
 		try {
 				
-				register();
-				injectLetter();
-				getFullLetterPool();
-				//ecouteContinue();
+			register();
+			ecouteContinue();
+			injectLetter();
+			while(true) {
+				read();
+			}
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

@@ -52,7 +52,7 @@ public class Politicien implements Runnable{
         System.out.println("------------------------");
 	}
 	
-	public boolean initialzeLetters() throws IOException {
+	public boolean initialzeLetters() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_letterpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -70,7 +70,7 @@ public class Politicien implements Runnable{
 		return true;
 	}
 	
-	public boolean initialzeWords() throws IOException {
+	public boolean initialzeWords() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_wordpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -88,7 +88,7 @@ public class Politicien implements Runnable{
 		return true;
 	}
 	
-	public boolean listen() throws IOException, ClassNotFoundException, NoSuchAlgorithmException {
+	public boolean listen() throws IOException, ClassNotFoundException, NoSuchAlgorithmException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("listen",JSONObject.NULL);
 		String msg = obj.toString();
@@ -133,7 +133,7 @@ public class Politicien implements Runnable{
 		return word;
 	}
 	
-	public List<JSONObject> getLettreOfWord(String word){
+	public List<JSONObject> getLettreOfWord(String word) throws JSONException{
 		List<JSONObject> result = new ArrayList<JSONObject>();
 		for(String c : Arrays.asList(word.split(""))){
 			Letter lettre = letters.stream().filter(l -> l.letter.equals(c)).collect(Collectors.toList()).get(0);
@@ -142,7 +142,7 @@ public class Politicien implements Runnable{
 		return result;
 	}
 	
-	public JSONObject lettreToJson(Letter letter){
+	public JSONObject lettreToJson(Letter letter) throws JSONException{
 		JSONObject result = new JSONObject();
 		result.put("letter", letter.letter);
 		result.put("period", letter.period);

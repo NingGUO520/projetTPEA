@@ -2,6 +2,7 @@ package projet;
 
 import java.util.Map;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Letter {
@@ -11,7 +12,7 @@ public class Letter {
 	String author;
 	String signature;
 	
-	public Letter(String s) {
+	public Letter(String s) throws JSONException {
 		JSONObject object = new JSONObject(s);
 		Map<String, Object> map= Utils.jsonToMap(object);
 		this.letter = (String) map.get("letter");
