@@ -5,12 +5,9 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.Socket;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Signature;
 import java.security.SignatureException;
@@ -32,7 +29,8 @@ public class Auteur implements Runnable{
 	private ArrayList<String> letters;
 	private long periode;
 	private String keyPublic;
-	
+	private static int authorNumber=0;
+	private int id;
 	
 	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException{
 		periode = 0;
@@ -43,6 +41,7 @@ public class Auteur implements Runnable{
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
 		keyPublic = Utils.getHexKey(pair.getPublic());
+		id = ++authorNumber;
 	}
 	
 	public void read() throws IOException {
@@ -50,7 +49,7 @@ public class Auteur implements Runnable{
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
 		String s = new String(cbuf,"UTF-8");
-		System.out.println(s);
+		System.out.println("Author "+id+" receive "+s);
 		
 	}
 	public boolean register() throws IOException, ClassNotFoundException, NoSuchAlgorithmException {
@@ -64,7 +63,7 @@ public class Auteur implements Runnable{
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
 		String s = new String(cbuf,"UTF-8");
-		System.out.println(s);
+		System.out.println("Author "+authorNumber+" receive "+s);
 		
 		JSONObject object = new JSONObject(s);
 		JSONArray array  =  (JSONArray) object.get("letters_bag");
@@ -153,7 +152,7 @@ public class Auteur implements Runnable{
 				register();
 				injectLetter();
 				getFullLetterPool();
-				ecouteContinue();
+				//ecouteContinue();
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
