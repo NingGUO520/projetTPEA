@@ -14,6 +14,8 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import org.json.JSONArray;
@@ -33,6 +35,7 @@ public class Auteur implements Runnable{
 	private static int authorNumber=0;
 	private int id;
 	private Bloc bloc;
+
 	
 	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException, NoSuchProviderException{
 		periode = 0;
@@ -45,18 +48,22 @@ public class Auteur implements Runnable{
 		pair = kp.generateKeyPair();
 		keyPublic = Utils.getHexKey(pair.getPublic());
 		bloc = new Bloc();
+		
 		id = ++authorNumber;
+		System.out.println("AUTEUR "+id+" CONNECTED");
+        System.out.println("------------------------");
 	}
 	
-	public void read() throws IOException, JSONException {
+	public String read() throws IOException, JSONException {
 		long taille_ans = inchan.readLong();
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
 		String s = new String(cbuf,"UTF-8");
-		System.out.println("Author "+id+" receive "+s);
-		
-		
+//		System.out.println("Author "+id+" receive "+s);
+		return s;
 	}
+	
+	
 	public boolean register() throws IOException, ClassNotFoundException, NoSuchAlgorithmException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("register",keyPublic);
@@ -90,6 +97,7 @@ public class Auteur implements Runnable{
 		
 		bloc = new Bloc(letter, bloc);
 		
+
 		return true;
 	}
 	
@@ -104,6 +112,8 @@ public class Auteur implements Runnable{
 		lettre.put("author", keyPublic);
 		String s = Utils.hash(Utils.toBinaryString(l)+Long.toBinaryString(periode)+Utils.hash("")+keyPublic);
 		lettre.put("signature", signMessage(s));
+		System.out.println("Author "+id+" inject letter "+ l );
+
 		return lettre;
 	}
 	
@@ -126,6 +136,24 @@ public class Auteur implements Runnable{
 		
 	}
 	
+	
+	public boolean stopListen() throws JSONException, IOException {
+		JSONObject obj = new JSONObject();
+		obj.put("stop_listen",JSONObject.NULL);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		return true;
+		
+	}
+	
+	/**
+	 * Pour obtenir l'ensemble des lettres injectées depuis le début de la partie
+	 * @return
+	 * @throws IOException
+	 * @throws JSONException
+	 */
 	public boolean getFullLetterPool() throws IOException, JSONException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_letterpool",JSONObject.NULL);
@@ -133,8 +161,21 @@ public class Auteur implements Runnable{
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+	
+		String s = read();
+		JSONObject object = new JSONObject(s);
+		JSONObject full_letterpool  =  (JSONObject) object.get("full_letterpool");
+		JSONArray array  =  (JSONArray) full_letterpool.get("letters");
 		
-		read();
+		ArrayList<Letter> letterPool = new ArrayList<Letter>();
+		for(int i = 0; i<array.length();i++){
+			letterPool.add(new Letter(array.get(i).toString().substring(3, array.get(i).toString().length()-1)));
+		}
+		System.out.print("Author "+id+" receive letter pool : ");
+		for(Letter l: letterPool) {
+			System.out.print(l.letter+", ");
+		}
+		System.out.print("\n");
 		return true;
 	}
 	
@@ -146,10 +187,39 @@ public class Auteur implements Runnable{
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+//		read();
+
+		return true;
+	}
+	
+	/**
+	 *  obtenir les mots injectés
+	 */
+	public boolean getFullWordPool() throws IOException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put("get_full_wordpool",JSONObject.NULL);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		
+		read();
+		return true;
+	}
+	
+	
+	public boolean getWordPoolSince(int p) throws IOException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put("get_wordpool_since",p);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
 		read();
 
 		return true;
 	}
+	
 	
 	public void next_turn(JSONObject o) throws InvalidKeyException, JSONException, NoSuchAlgorithmException, SignatureException, IOException {
 		periode = o.getInt("period");
@@ -164,11 +234,14 @@ public class Auteur implements Runnable{
 				
 			register();
 			ecouteContinue();
-			injectLetter();
-			injectLetter();
 			while(true) {
-				read();
+				injectLetter();
+				Thread.sleep(1000);
+				getFullLetterPool();
+//				getFullWordPool();
+
 			}
+			
 			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -186,6 +259,9 @@ public class Auteur implements Runnable{
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (SignatureException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
