@@ -127,7 +127,7 @@ public class Auteur implements Runnable{
 	 */
 	public void inject_letter() throws InterruptedException, JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
 		int tps_calcul= random.nextInt(5000)+5000;
-		Thread.sleep(random.nextInt(5000));
+		Thread.sleep(tps_calcul);
 		get_full_letterPool();
 		if(work) {
 			JSONObject injection = new JSONObject();
