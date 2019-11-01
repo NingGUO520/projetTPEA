@@ -103,12 +103,23 @@ public class Politicien implements Runnable{
 	
 	public List<String> checkWordIfExist(){
 		List<String> guessWordsAsString = Word.ListOfWordsToListOfString(guessWords);
-		return allWords.stream().filter(word->!guessWordsAsString.contains(word)).filter(word -> check(word)).collect(Collectors.toList());
+		return allWords.stream().filter(word->!guessWordsAsString.contains(word))
+				.filter(word -> check(word))
+				.filter(word -> oneLettreForEachAuthor(word))
+				.collect(Collectors.toList());
 	}
 	
 	public boolean check(String word){
 		List<String> lettre = letters.stream().map(l -> l.letter).collect(Collectors.toList());
 		return Arrays.asList(word.split("")).stream().filter(c -> lettre.contains(c)).count() == Arrays.asList(word.split("")).size();
+	}
+	
+	public boolean oneLettreForEachAuthor(String word) {
+		return Arrays.asList(word.split("")).stream().map(c -> getAuthor(c)).distinct().count() == Arrays.asList(word.split("")).size();
+	}
+	
+	public String getAuthor(String c) {
+		return letters.stream().filter(l -> l.letter.equals(c)).map(l -> l.author).findAny().get();
 	}
 	
 	public synchronized boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException {
