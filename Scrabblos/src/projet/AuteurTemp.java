@@ -47,7 +47,7 @@ public class AuteurTemp implements Runnable{
 		kp.initialize(1024, SecureRandom.getInstance("SHA1PRNG", "SUN"));
 		pair = kp.generateKeyPair();
 		keyPublic = Utils.getHexKey(pair.getPublic());
-		bloc = new Bloc();
+		//bloc = new Bloc();
 		
 		id = ++authorNumber;
 		System.out.println("AUTEUR "+id+" CONNECTED");

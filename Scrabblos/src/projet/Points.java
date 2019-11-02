@@ -2,6 +2,10 @@ package projet;
 
 import java.util.Map;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class Points {
 	
 	public static int getScore(char lettre) {
@@ -43,10 +47,10 @@ public class Points {
 		}
 	}
 	
-	public static int score_mot(String mot) {
+	public static int score_mot(JSONArray word) throws JSONException {
 		int score  = 0;
-		for(int i=0;i<mot.length();i++) {
-			score+=getScore(mot.charAt(i));
+		for(int i=0;i<word.length();i++) {
+			score+=getScore(word.getJSONObject(i).getString("letter").charAt(0));
 		}
 		return score;
 	}

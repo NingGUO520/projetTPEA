@@ -13,7 +13,9 @@ import java.security.NoSuchProviderException;
 import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -30,11 +32,13 @@ public class Auteur implements Runnable{
 	private String keyPublic; //clé publique simplifiée
 	private JSONArray letters_bag;
 	private Random random = new Random();
-	private int score = 0;
 	private boolean work;
 	private int periode;
 	private JSONArray letterPool;
 	private Map<Integer,JSONArray> map_wordPool;
+	private Map<String,Integer> scores_authors;
+	private Map<String,Integer> scores_politicians;
+	private List<Bloc> blockchain;
 	
 	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException, NoSuchProviderException {
 		//Création connexion
@@ -50,9 +54,17 @@ public class Auteur implements Runnable{
 		
 		//Création bassin de mots local
 		map_wordPool = new HashMap<Integer, JSONArray>();
+		letterPool = new JSONArray();
 		
 		//peut injecter à sa création
 		work = true;
+		
+		//Maps pour stocker localement les scores des auteurs et politiciens
+		scores_authors = new HashMap<String, Integer>();
+		scores_politicians = new HashMap<String, Integer>();
+		
+		//blockchain
+		blockchain = new ArrayList<Bloc>();
 		
 	}
 	
@@ -66,15 +78,15 @@ public class Auteur implements Runnable{
 		obj.put("register",keyPublic);
 		outchan.writeLong(obj.toString().length());
 		outchan.write(obj.toString().getBytes(StandardCharsets.UTF_8));
-		read();
 	}
 	
 	/**
 	 * Lecture des messages du serveur
 	 * @throws IOException 
 	 * @throws JSONException
+	 * @throws NoSuchAlgorithmException 
 	 */
-	public void read() throws IOException, JSONException {
+	public void read() throws IOException, JSONException, NoSuchAlgorithmException {
 		long taille_ans = inchan.readLong();
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
@@ -85,7 +97,7 @@ public class Auteur implements Runnable{
 		
 		switch ((String)msg.keys().next()) {
 		case "next_turn":
-			getWordPoolSince(periode);
+			chooseWord(periode);
 			periode = msg.getInt("next_turn");
 			System.out.println("nouvelle periode : "+periode);
 			work = true;
@@ -93,18 +105,21 @@ public class Auteur implements Runnable{
 		case "letters_bag":
 				letters_bag = msg.getJSONArray("letters_bag");
 				System.out.println("Sac de lettres recu : "+letters_bag);
-				get_full_letterPool();
-				//TODO Ajout récupération bassin de mots complet
 			break;
 			
 		case "full_letterpool":
 			obj = msg.getJSONObject("full_letterpool");
 			updateLetterPool(obj);
 			break;
+			
+		case "full_wordpool": //TODO
+			break;
+			
+		case "diff_letterpool": //TODO
+			break;
 		case "diff_wordpool":
 			//TODO Election du mot au début de la blockchain ?
-			chooseWord(msg.getJSONObject("diff_wordpool").getInt("since"), 
-					msg.getJSONObject("diff_wordpool").getJSONObject("wordpool"));
+					msg.getJSONObject("diff_wordpool").getJSONObject("wordpool");
 			break;
 			
 		case "inject_word":
@@ -130,6 +145,21 @@ public class Auteur implements Runnable{
 	}
 	
 	/**
+	 * demander le bassin de lettre à partir d'une certaine periode
+	 * @param p periode a partir de laquelle on recupere le bassin de lettre
+	 * @throws IOException
+	 * @throws JSONException
+	 */
+	public void getLetterPoolSince(int p) throws IOException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put("get_letterpool_since",p);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+	}
+	
+	/**
 	 * Envoyer une lettre au serveur
 	 * @throws InterruptedException
 	 * @throws JSONException
@@ -141,7 +171,6 @@ public class Auteur implements Runnable{
 	public void inject_letter() throws InterruptedException, JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
 		int tps_calcul= random.nextInt(5000)+5000;
 		Thread.sleep(tps_calcul);
-		get_full_letterPool();
 		if(work) {
 			JSONObject injection = new JSONObject();
 			JSONObject letter = getLetter();
@@ -196,11 +225,13 @@ public class Auteur implements Runnable{
 		lettre.put("letter", l);
 		lettre.put("period", periode);
 		String head;
-		if(letterPool.length() == 0) {
+		
+		if(blockchain.size() == 0) {
 			head = Utils.hash("");
 		}
 		else {
-			head = Utils.hash(letterPool.get(letterPool.length()-1).toString());
+			//head est le hash du mot en tete de la chaine de blocs
+			head =blockchain.get(blockchain.size()-1).getHash();
 		}
 		lettre.put("head",head);
 		lettre.put("author", keyPublic);
@@ -240,6 +271,35 @@ public class Auteur implements Runnable{
 		System.out.println(keyPublic+" sur écoute");
 		
 	}
+	/**
+	 * Arreter l'écoute continue de messages d'injection envoyés par le serveur
+	 * @throws JSONException
+	 * @throws IOException
+	 */
+	public void stopListen() throws JSONException, IOException {
+		JSONObject obj = new JSONObject();
+		obj.put("stop_listen",JSONObject.NULL);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		
+	}
+	
+	/**
+	 * 
+	 * @return Envoi d'un message au serveur pour récuperer le bassin complet de mots injectés 
+	 * @throws IOException
+	 * @throws JSONException
+	 */
+	public void getFullWordPool() throws IOException, JSONException {
+		JSONObject obj = new JSONObject();
+		obj.put("get_full_wordpool",JSONObject.NULL);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+	}
 	
 	/**
 	 * 
@@ -256,21 +316,69 @@ public class Auteur implements Runnable{
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
 	}
 	/**
-	 * Election du mot avec calcul local du score des joueurs ? //TODO
-	 * @param period
-	 * @param obj
+	 * Choix du mot qui va être en tête de la chaine (choix parmis les mots injectés dans la précédente période)
+	 * @param period periode 
+	 * @throws JSONException 
+	 * @throws NoSuchAlgorithmException 
 	 */
-	public void chooseWord(int period,JSONObject obj) {
+	public void chooseWord(int period) throws JSONException, NoSuchAlgorithmException {
+		if(map_wordPool.containsKey(period)) {
+			int taille =map_wordPool.get(period).length();
+			int score_max =0;
+			JSONObject winner = null;
+			for(int i=0;i<taille;i++) {
+				JSONObject o =map_wordPool.get(period).getJSONObject(i);
+				JSONArray letters = o.getJSONArray("word");
+				int score = Points.score_mot(letters);
+				if(score > score_max) { score_max = score; winner = o;}					
+			}
+			if(winner !=null) {
+				if(blockchain.isEmpty()) { blockchain.add(new Bloc(winner));}
+				else { blockchain.add(new Bloc(winner,blockchain.get(blockchain.size()-1)));}				
+				System.out.println("mot élu ("+score_max+" points) :"+winner );
+				
+				//calcul score des joueurs
+				updateScore_politician(winner.getString("politician"), score_max);
+				//TODO calcul score auteurs
+
+			}
+		}
 		
 	}
+	
+	/**
+	 * Mettre à jour le score d'un politicien
+	 * @param politician clé publique du politicien
+	 * @param additionalPoints points supplémentaires du politicien
+	 */
+	public void updateScore_politician(String politician, int additionalPoints) {
+		if(!scores_politicians.containsKey(politician)) { scores_politicians.put(politician, additionalPoints);}
+		else {scores_politicians.replace(politician, additionalPoints+scores_politicians.get(politician)) ;}
+	}
+	
 	/**
 	 * Ajout local d'un mot qui vient d'être injecté (quand pas de listen de l'auteur?) //TODO
 	 * @param p période à laquelle le mot a été injecté
 	 * @param word mot injecté
+	 * @throws JSONException 
 	 */
-	public void addWordToPeriod(int p,JSONObject word) {
-		if(!map_wordPool.containsKey(p)) { map_wordPool.put(p, new JSONArray()); }
-		map_wordPool.get(p).put(word);
+	public void addWordToPeriod(int p,JSONObject word) throws JSONException {
+		//Vérification validité du mot (pas plusieurs lettres du même auteur)
+		boolean is_valid =true;
+		JSONArray letters = word.getJSONArray("word");
+		List<String> authors = new ArrayList<String>();
+		for(int i=0;i<letters.length();i++) {
+			JSONObject l = letters.getJSONObject(i);
+			String a = l.getString("author");
+			if(!authors.contains(a)) { authors.add(a);}
+			else { is_valid=false; break;}
+		}
+		
+		//Ajout si le mot est valide
+		if(is_valid) {
+			if(!map_wordPool.containsKey(p)) { map_wordPool.put(p, new JSONArray()); }
+			map_wordPool.get(p).put(word);
+		}
 	}
 	
 	//TODO AddLetterToPeriod (voir ci-dessus)
@@ -280,11 +388,10 @@ public class Auteur implements Runnable{
 	public void run() {
 		try {
 			register();
+			read();
 			listen();
 			while(true) {
-				if(work) {
-					inject_letter();
-				}
+				inject_letter();
 				read();
 			}
 		} catch (JSONException | IOException | InvalidKeyException | NoSuchAlgorithmException | SignatureException | InterruptedException e) {
