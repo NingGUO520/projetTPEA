@@ -334,7 +334,9 @@ public class Auteur implements Runnable{
 			}
 			if(winner !=null) {
 				if(blockchain.isEmpty()) { blockchain.add(new Bloc(winner));}
-				else { blockchain.add(new Bloc(winner,blockchain.get(blockchain.size()-1)));}				
+				else { 
+					//TODO vérifier que le head de winner correspond au hash du bloc precedent
+					blockchain.add(new Bloc(winner,blockchain.get(blockchain.size()-1)));}				
 				System.out.println("mot élu ("+score_max+" points) :"+winner );
 				
 				//calcul score des joueurs
