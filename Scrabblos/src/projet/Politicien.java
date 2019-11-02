@@ -27,6 +27,7 @@ public class Politicien implements Runnable{
 	private DataInputStream inchan;
 	private static int politicienNumber=0;
 	private int id;
+	private int periode;
 	private KeyPair pair;
 	private String keyPublic;
 	private List<Letter> letters;
@@ -48,58 +49,28 @@ public class Politicien implements Runnable{
         System.out.println("------------------------");
 	}
 	
-	public synchronized boolean initialzeLetters() throws IOException, JSONException {
+	public synchronized boolean initialzeLetters() throws IOException, JSONException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_letterpool",JSONObject.NULL);
 		String msg = obj.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
-		String s = read();
-		JSONObject object = new JSONObject(s);
-		JSONObject full_letterpool  =  (JSONObject) object.get("full_letterpool");
-		JSONArray array  =  (JSONArray) full_letterpool.get("letters");
-		letters.removeAll(letters);
-		for(int i = 0; i<array.length();i++){
-			letters.add(new Letter(array.get(i).toString().substring(3, array.get(i).toString().length()-1)));
-		}
-		System.out.println("Les lettres injectees "+letters);
+		read();
 		return true;
 	}
 	
-	public synchronized boolean initialzeWords() throws IOException, JSONException {
+	public synchronized boolean initialzeWords() throws IOException, JSONException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_wordpool",JSONObject.NULL);
 		String msg = obj.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
-		String s = read();
-		JSONObject object = new JSONObject(s);
-		JSONObject full_letterpool  =  (JSONObject) object.get("full_wordpool");
-		JSONArray array  =  (JSONArray) full_letterpool.get("words");
-		guessWords.removeAll(guessWords);
-		for(int i = 0; i<array.length();i++){
-			guessWords.add(new Word(array.get(i).toString().substring(3, array.get(i).toString().length()-1)));
-		}
-		System.out.println("Les mots injectes "+guessWords);
+		read();
 		return true;
 	}
 	
-	public boolean listen() throws IOException, ClassNotFoundException, NoSuchAlgorithmException, JSONException, InvalidKeyException, SignatureException, InterruptedException {
-		JSONObject obj = new JSONObject();
-		obj.put("listen",JSONObject.NULL);
-		String msg = obj.toString();
-		long taille = msg.length();
-		outchan.writeLong(taille);
-		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
-		String s = read();
-		initialzeLetters();
-		initialzeWords();
-		Thread.sleep(1000);
-		injectWord();
-		return true;
-	}
 	
 	public List<String> checkWordIfExist(){
 		List<String> guessWordsAsString = Word.ListOfWordsToListOfString(guessWords);
@@ -125,8 +96,7 @@ public class Politicien implements Runnable{
 	public synchronized boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException {
 		List<String> listOfWords = checkWordIfExist();
 		if(!listOfWords.isEmpty()){
-			System.out.println("inject word");
-			System.out.println(listOfWords);
+			System.out.println("Politicien "+id+" inject word "+listOfWords);
 			JSONObject injection = new JSONObject();
 			injection.put("inject_word", getWord(listOfWords.get(0)));
 			String msg = injection.toString();
@@ -182,24 +152,71 @@ public class Politicien implements Runnable{
 				Thread.sleep(1000);
 				initialzeLetters();
 				initialzeWords();
-				injectWord();
+				read();
 			}
-		} catch (IOException | InvalidKeyException | NoSuchAlgorithmException | JSONException | SignatureException e) {
+		} catch (IOException | JSONException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (SignatureException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
 	}
 	
-	public String read() throws IOException {
+	public void read() throws IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, JSONException {
 		long taille_ans = inchan.readLong();
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
 		String s = new String(cbuf,"UTF-8");
 		System.out.println("Politicien "+id+" recieve "+s);
-		return s;
+		JSONObject msg = new JSONObject(s);
+		
+		switch ((String)msg.keys().next()) {
+		case "next_turn":
+			periode = msg.getInt("next_turn");
+			System.out.println("Politicien "+id+" recoit : nouvelle periode : "+periode);
+			injectWord();
+			break;
+			
+		case "full_letterpool":
+			JSONObject full_letterpool  =  (JSONObject) msg.get("full_letterpool");
+			JSONArray array  =  (JSONArray) full_letterpool.get("letters");
+			letters.removeAll(letters);
+			for(int i = 0; i<array.length();i++){
+				letters.add(new Letter(array.get(i).toString().substring(array.get(i).toString().indexOf("{"), array.get(i).toString().length()-1)));
+			}
+			System.out.println("Politicien "+id+" recoit : Les lettres injectees "+letters);
+			break;
+			
+		case "full_wordpool":
+			JSONObject full_wordpool  =  (JSONObject) msg.get("full_wordpool");
+			JSONArray array1  =  (JSONArray) full_wordpool.get("words");
+			guessWords.removeAll(guessWords);
+			for(int i = 0; i<array1.length();i++){
+				guessWords.add(new Word(array1.get(i).toString().substring(array1.get(i).toString().indexOf("{"), array1.get(i).toString().length()-1)));
+			}
+			System.out.println("Politicien "+id+" recoit : Les mots injectes "+guessWords);
+			break;
+			
+		case "diff_letterpool": //TODO
+			break;
+		case "diff_wordpool":
+			msg.getJSONObject("diff_wordpool").getJSONObject("wordpool");
+			break;
+
+		
+		default:
+			break;
+		}
 	}
 
 }
