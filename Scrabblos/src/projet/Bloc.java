@@ -17,6 +17,7 @@ public class Bloc {
 	public Bloc(JSONObject content, Bloc previous) throws NoSuchAlgorithmException {
 		this(content);
 		this.previous = previous;
+		head = previous.getHash();
 	}
 	public String getHash() throws NoSuchAlgorithmException {
 		return Utils.hash(content.toString());
