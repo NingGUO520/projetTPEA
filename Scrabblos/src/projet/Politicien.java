@@ -24,6 +24,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import projet.Utils.Bloc;
+import projet.Utils.Letter;
+import projet.Utils.Points;
+import projet.Utils.Utils;
+import projet.Utils.Word;
+
 public class Politicien implements Runnable{
     
     private Socket socket;
@@ -34,6 +40,7 @@ public class Politicien implements Runnable{
 	private int periode;
 	private KeyPair pair;
 	private String keyPublic;
+	private boolean work;
 	private Random random = new Random();
 	private List<Letter> letters;
 	private List<String> dictionary;
@@ -48,6 +55,7 @@ public class Politicien implements Runnable{
 		inchan = new DataInputStream(socket.getInputStream());
 		outchan = new DataOutputStream(socket.getOutputStream());
 		id = ++politicienNumber;
+		work = true;
 		letters = new ArrayList<Letter>();
 		guessWords = new ArrayList<Word>();
 		guessWordsOfLastPeriod = new ArrayList<Word>();
@@ -106,19 +114,28 @@ public class Politicien implements Runnable{
 		return letters.stream().filter(l -> l.letter.equals(c)).map(l -> l.author).findAny().get();
 	}
 	
-	public synchronized boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException, InterruptedException {
+	public synchronized void injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException, InterruptedException {
 		Thread.sleep(5000+random.nextInt(2000));
-		List<String> listOfWords = checkWordIfExist();
-		if(!listOfWords.isEmpty()){
-			System.out.println("Politicien "+id+" inject word "+listOfWords);
-			JSONObject injection = new JSONObject();
-			injection.put("inject_word", getWord(listOfWords.get(0)));
-			String msg = injection.toString();
-			long taille = msg.length();
-			outchan.writeLong(taille);
-			outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		if(work) {
+			getPeriodeWord(periode-1);
+			getPeriodeWord(periode);
+			setDictionary();
+			List<String> listOfWords = checkWordIfExist();
+			if(!listOfWords.isEmpty()){
+				System.out.println("Politicien "+id+" inject word "+listOfWords);
+				JSONObject injection = new JSONObject();
+				injection.put("inject_word", getWord(listOfWords.get(0)));
+				String msg = injection.toString();
+				long taille = msg.length();
+				outchan.writeLong(taille);
+				outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+			}
+			work = false;
 		}
-		return true;
+		else {
+			System.out.println("Politicien "+id+" attend prochain tour");
+	
+		}
 	}
 	
 	public JSONObject getWord(String w) throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidKeyException, JSONException, SignatureException {
@@ -164,9 +181,9 @@ public class Politicien implements Runnable{
 		else blockchain.add(new Bloc(content,blockchain.get(blockchain.size()-1)));
 	}
 	
-	public void getLastPeriodeWord() throws JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, InterruptedException {
+	public void getPeriodeWord(int p) throws JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, InterruptedException {
 		JSONObject obj = new JSONObject();
-		obj.put("get_wordpool_since",periode-1);
+		obj.put("get_wordpool_since", p);
 		String msg = obj.toString();
 		long taille = msg.length();
 		outchan.writeLong(taille);
@@ -228,6 +245,7 @@ public class Politicien implements Runnable{
 				initialzeLetters();
 				initialzeWords();
 				read();
+				injectWord();
 			}
 		} catch (IOException | InterruptedException | JSONException | InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
 			printWinner();
@@ -247,9 +265,7 @@ public class Politicien implements Runnable{
 		case "next_turn":
 			periode = msg.getInt("next_turn");
 			System.out.println("Politicien "+id+" recoit : nouvelle periode : "+periode);
-			getLastPeriodeWord();
-			setDictionary();
-			injectWord();
+			work = true;
 			break;
 			
 		case "full_letterpool":
@@ -273,17 +289,28 @@ public class Politicien implements Runnable{
 			break;
 			
 		case "diff_wordpool":
-			JSONObject diff_wordpool  =  (JSONObject)msg.getJSONObject("diff_wordpool").get("wordpool");;
-			JSONArray array2  =  (JSONArray) diff_wordpool.get("words");
-			guessWordsOfLastPeriod.removeAll(guessWordsOfLastPeriod);
-			for(int i = 0; i<array2.length();i++){
-				guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
+			JSONObject diff_wordpool  =  (JSONObject)msg.getJSONObject("diff_wordpool");
+			JSONObject wordpool  =  (JSONObject)msg.getJSONObject("diff_wordpool").get("wordpool");
+			JSONArray array2  =  (JSONArray) wordpool.get("words");
+			String StringPeriod = periode+"";
+			String StringPeriodSubOne = periode-1+"";
+			if((diff_wordpool.get("since").toString()).equals(StringPeriodSubOne)){
+				guessWordsOfLastPeriod.removeAll(guessWordsOfLastPeriod);
+				for(int i = 0; i<array2.length();i++){
+					guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
+				}
+				System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
+				if(!guessWordsOfLastPeriod.isEmpty()) {
+					Word bestWord = bestWordOfLastPeriod();
+					addBlockchaine(periode, bestWord.wordAsObject);
+					score(bestWord);
+				}
 			}
-			System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
-			if(!guessWordsOfLastPeriod.isEmpty()) {
-				Word bestWord = bestWordOfLastPeriod();
-				addBlockchaine(periode, bestWord.wordAsObject);
-				score(bestWord);
+			else {
+				for(int i = 0; i<array2.length();i++){
+					guessWords.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
+				}
+				System.out.println("Politicien "+id+" recoit : Les mots injectes de cette période "+guessWords);
 			}
 			break;
 

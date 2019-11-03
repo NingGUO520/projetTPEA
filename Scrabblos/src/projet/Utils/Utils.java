@@ -1,4 +1,4 @@
-package projet;
+package projet.Utils;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
