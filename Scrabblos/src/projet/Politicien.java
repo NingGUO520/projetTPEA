@@ -252,7 +252,7 @@ public class Politicien implements Runnable{
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
 		String s = new String(cbuf,"UTF-8");
-		System.out.println("Politicien "+id+" recieve "+s);
+//		System.out.println("Politicien "+id+" recieve "+s);
 		JSONObject msg = new JSONObject(s);
 		
 		switch ((String)msg.keys().next()) {

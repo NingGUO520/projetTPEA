@@ -131,7 +131,7 @@ public class Auteur implements Runnable{
 			break;
 			
 		case "inject_word":
-			System.out.println("inject word");
+//			System.out.println("inject word");
 			obj = msg.getJSONObject("inject_word");
 			addWordToPeriod(periode,obj);
 			break;
