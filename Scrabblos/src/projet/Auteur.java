@@ -34,7 +34,7 @@ public class Auteur implements Runnable{
 	private Random random = new Random();
 	private boolean work;
 	private int periode;
-	private JSONArray letterPool;
+	private Map<Integer,JSONArray> map_letterPool;
 	private Map<Integer,JSONArray> map_wordPool;
 	private Map<String,Integer> scores_authors;
 	private Map<String,Integer> scores_politicians;
@@ -52,9 +52,9 @@ public class Auteur implements Runnable{
 		pair = kp.generateKeyPair();
 		keyPublic = Utils.getHexKey(pair.getPublic());
 		
-		//Création bassin de mots local
+		//Création bassin de lettres et mots locaux
 		map_wordPool = new HashMap<Integer, JSONArray>();
-		letterPool = new JSONArray();
+		map_letterPool = new HashMap<Integer, JSONArray>();
 		
 		//peut injecter à sa création
 		work = true;
@@ -112,7 +112,7 @@ public class Auteur implements Runnable{
 			updateLetterPool(obj);
 			break;
 			
-		case "full_wordpool": //TODO
+		case "full_wordpool": //TODO 
 			break;
 			
 		case "diff_letterpool": //TODO
@@ -169,8 +169,7 @@ public class Auteur implements Runnable{
 	 * @throws SignatureException
 	 */
 	public void inject_letter() throws InterruptedException, JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
-		int tps_calcul= random.nextInt(5000)+5000;
-		Thread.sleep(tps_calcul);
+		Thread.sleep(5000+random.nextInt(2000));
 		if(work) {
 			JSONObject injection = new JSONObject();
 			JSONObject letter = getLetter();
@@ -189,22 +188,19 @@ public class Auteur implements Runnable{
 	
 	/**
 	 * Mettre à jour le bassin de lettres injectées
-	 * @param obj bassin de lettre courant
+	 * @param obj bassin de lettres courant
 	 * @throws JSONException
 	 */
 	public void updateLetterPool(JSONObject obj) throws JSONException {
+		map_letterPool.clear();
 		periode = obj.getInt("current_period");
-		letterPool = obj.getJSONArray("letters");
+		JSONArray letterPool = obj.getJSONArray("letters");
 		System.out.println("nouveau pool de lettres : "+letterPool.toString());
 		
-		//Vérification travail
 		for(int i=letterPool.length()-1;i>=0;i--) {
 			JSONObject l = letterPool.getJSONArray(i).getJSONObject(1);
-			int current_periode = l.getInt("period");
-			String author = l.getString("author");
-			if(current_periode < periode) {work = true;break;}
-			if(current_periode == periode && author.equals(keyPublic)) { work = false;break;}
-			if(current_periode > periode) {work = true; periode = current_periode; break;}
+			int current_periode = l.getInt("period");			
+			addLetterToPeriod(current_periode, l);
 		}
 		
 	}
@@ -335,13 +331,13 @@ public class Auteur implements Runnable{
 			if(winner !=null) {
 				if(blockchain.isEmpty()) { blockchain.add(new Bloc(winner));}
 				else { 
-					//TODO vérifier que le head de winner correspond au hash du bloc precedent
 					blockchain.add(new Bloc(winner,blockchain.get(blockchain.size()-1)));}				
 				System.out.println("mot élu ("+score_max+" points) :"+winner );
 				
 				//calcul score des joueurs
 				updateScore_politician(winner.getString("politician"), score_max);
-				//TODO calcul score auteurs
+				//calcul score auteurs
+				updateScore_authors(winner.getJSONArray("word"));
 
 			}
 		}
@@ -359,7 +355,24 @@ public class Auteur implements Runnable{
 	}
 	
 	/**
-	 * Ajout local d'un mot qui vient d'être injecté (quand pas de listen de l'auteur?) //TODO
+	 * Met à jour le score d'auteurs en ajoutant les points des lettres d'un nouveau mot élu
+	 * @param lettres lettres du nouveau mot élu 
+	 * @throws JSONException
+	 */
+	public void updateScore_authors(JSONArray lettres) throws JSONException {
+		for(int i=0;i<lettres.length();i++) {
+			JSONObject o = lettres.getJSONObject(i);
+			int points =  Points.getScore(o.getString("letter").charAt(0));
+			String author = o.getString("author");
+			
+			if(!scores_authors.containsKey(author)) { scores_authors.put(author, points);}
+			else {scores_authors.replace(author, points+scores_authors.get(author)) ;}
+		}
+		
+	}
+	
+	/**
+	 * Ajout local d'un mot qui vient d'être injecté (quand pas de listen de l'auteur?)
 	 * @param p période à laquelle le mot a été injecté
 	 * @param word mot injecté
 	 * @throws JSONException 
@@ -376,6 +389,8 @@ public class Auteur implements Runnable{
 			else { is_valid=false; break;}
 		}
 		
+		//TODO vérifier le head par rapport a la tete de chaine ??
+		
 		//Ajout si le mot est valide
 		if(is_valid) {
 			if(!map_wordPool.containsKey(p)) { map_wordPool.put(p, new JSONArray()); }
@@ -383,7 +398,29 @@ public class Auteur implements Runnable{
 		}
 	}
 	
-	//TODO AddLetterToPeriod (voir ci-dessus)
+	/**
+	 * Ajout local d'une lettre injectée
+	 * @param p période d'injection de la lettre
+	 * @param l lettre injectée
+	 * @throws JSONException 
+	 */
+	public void addLetterToPeriod(int p,JSONObject l) throws JSONException {
+		boolean is_valid =true;
+		
+		//Vérifier que l'auteur n'a pas déjà injecté à la période
+		if(map_letterPool.containsKey(p)) {
+			JSONArray lettres = map_letterPool.get(p);
+			for(int i=0;i<lettres.length();i++) {
+				if(lettres.getJSONObject(i).getString("author").equals(l.getString("author"))) { is_valid = false; break;}
+			}
+		}
+		
+		
+		if(is_valid) {
+			if(!map_letterPool.containsKey(p)) {map_letterPool.put(p, new JSONArray());}
+			map_letterPool.get(p).put(l);
+		}
+	}
 	
 
 	@Override
@@ -397,7 +434,7 @@ public class Auteur implements Runnable{
 				read();
 			}
 		} catch (JSONException | IOException | InvalidKeyException | NoSuchAlgorithmException | SignatureException | InterruptedException e) {
-			// TODO Auto-generated catch block
+			// TODO Déclarer les vainqueurs
 			e.printStackTrace();
 		}
 		
