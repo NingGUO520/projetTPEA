@@ -11,14 +11,15 @@ public class Word {
 
 	private List<Letter> word;
 	public String wordAsString="";
+	public JSONObject wordAsObject;
 	private String head;
 	private String politician;
 	private String signature;
 	public int point=0;
 
 	public Word(String s) throws JSONException {
-		JSONObject object = new JSONObject(s);
-		Map<String, Object> map= Utils.jsonToMap(object);
+		wordAsObject = new JSONObject(s);
+		Map<String, Object> map= Utils.jsonToMap(wordAsObject);
 		word = new ArrayList<Letter>();
 		for(Object l : ((List) map.get("word"))) {
 			this.word.add(new Letter(l.toString()));
