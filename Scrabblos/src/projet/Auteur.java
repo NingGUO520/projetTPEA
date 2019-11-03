@@ -516,6 +516,7 @@ public class Auteur implements Runnable{
 		} catch (JSONException | IOException | InvalidKeyException | NoSuchAlgorithmException | SignatureException | InterruptedException e) {
 			// TODO Déclarer les vainqueurs
 			winner();
+			System.exit(0);
 		}
 		
 		

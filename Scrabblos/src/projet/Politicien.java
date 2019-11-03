@@ -92,6 +92,24 @@ public class Politicien implements Runnable{
 		return true;
 	}
 	
+	/**
+	 * verifie si ce mot existe deja dans word pool
+	 * @param words
+	 * @return
+	 */
+	public List<String> checkWordIfAlreadyInPool( List<String> words){
+		List<String> result = new ArrayList<String>() ;
+		
+		for(String w : words) {
+			if(!guessWords.contains(w)) {
+				result.add(w);
+			}
+			
+		}
+		return result;
+	}
+	
+	
 	
 	public List<String> checkWordIfExist(){
 		List<String> guessWordsAsString = Word.ListOfWordsToListOfString(guessWords);
@@ -106,6 +124,11 @@ public class Politicien implements Runnable{
 		return Arrays.asList(word.split("")).stream().filter(c -> lettre.contains(c)).count() == Arrays.asList(word.split("")).size();
 	}
 	
+	/**
+	 * On verifie que les mots ne contiennent pas plus d’une lettre soumise par un même auteur
+	 * @param word
+	 * @return
+	 */
 	public boolean oneLettreForEachAuthor(String word) {
 		return Arrays.asList(word.split("")).stream().map(c -> getAuthor(c)).distinct().count() == Arrays.asList(word.split("")).size();
 	}
@@ -121,8 +144,10 @@ public class Politicien implements Runnable{
 			getPeriodeWord(periode);
 			setDictionary();
 			List<String> listOfWords = checkWordIfExist();
+			initialzeWords();
+			listOfWords = checkWordIfAlreadyInPool(listOfWords);
 			if(!listOfWords.isEmpty()){
-				System.out.println("Politicien "+id+" inject word "+listOfWords);
+				System.out.println("Politicien "+id+" inject word "+listOfWords.get(0));
 				JSONObject injection = new JSONObject();
 				injection.put("inject_word", getWord(listOfWords.get(0)));
 				String msg = injection.toString();
@@ -264,7 +289,7 @@ public class Politicien implements Runnable{
 		switch ((String)msg.keys().next()) {
 		case "next_turn":
 			periode = msg.getInt("next_turn");
-			System.out.println("Politicien "+id+" recoit : nouvelle periode : "+periode);
+			System.out.println("Politicien "+id+" est en nouvelle periode : "+periode);
 			work = true;
 			break;
 			
@@ -275,7 +300,7 @@ public class Politicien implements Runnable{
 			for(int i = 0; i<array.length();i++){
 				letters.add(new Letter(array.get(i).toString().substring(array.get(i).toString().indexOf("{"), array.get(i).toString().length()-1)));
 			}
-			System.out.println("Politicien "+id+" recoit : Les lettres injectees "+letters);
+			System.out.println("Politicien "+id+" recoit : letter pool "+letters);
 			break;
 			
 		case "full_wordpool":
@@ -285,7 +310,7 @@ public class Politicien implements Runnable{
 			for(int i = 0; i<array1.length();i++){
 				guessWords.add(new Word(array1.get(i).toString().substring(array1.get(i).toString().indexOf("{"), array1.get(i).toString().length()-1)));
 			}
-			System.out.println("Politicien "+id+" recoit : Les mots injectes "+guessWords);
+			System.out.println("Politicien "+id+" recoit : word pool "+guessWords);
 			break;
 			
 		case "diff_wordpool":
