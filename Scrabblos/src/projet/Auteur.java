@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Map.Entry;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -41,6 +42,7 @@ public class Auteur implements Runnable{
 	private Map<String,Integer> scores_authors;
 	private Map<String,Integer> scores_politicians;
 	private List<Bloc> blockchain;
+	private String identifiant;
 	
 	public Auteur(Socket s) throws IOException, NoSuchAlgorithmException, NoSuchProviderException {
 		//Création connexion
@@ -78,6 +80,7 @@ public class Auteur implements Runnable{
 	public void register() throws JSONException, IOException {
 		JSONObject obj = new JSONObject();
 		obj.put("register",keyPublic);
+		identifiant = keyPublic.substring(keyPublic.length()-6, keyPublic.length());
 		outchan.writeLong(obj.toString().length());
 		outchan.write(obj.toString().getBytes(StandardCharsets.UTF_8));
 	}
@@ -107,7 +110,7 @@ public class Auteur implements Runnable{
 			break;
 		case "letters_bag":
 				letters_bag = msg.getJSONArray("letters_bag");
-				System.out.println("Sac de lettres recu : "+letters_bag);
+				System.out.println("AUTEUR "+identifiant+" a recu sac de lettres  : "+letters_bag);
 			break;
 			
 		case "full_letterpool":
@@ -115,7 +118,9 @@ public class Auteur implements Runnable{
 			updateLetterPool(obj);
 			break;
 			
-		case "full_wordpool": //TODO 
+		case "full_wordpool":  
+			obj = msg.getJSONObject("full_wordpool");
+			afficheFullWordrPool(obj);
 			break;
 			
 		case "diff_letterpool": //TODO
@@ -136,7 +141,7 @@ public class Auteur implements Runnable{
 			break;
 		
 		default:
-			System.out.println(msg);
+//			System.out.println(msg);
 			break;
 		}
 	}
@@ -189,10 +194,11 @@ public class Auteur implements Runnable{
 			outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
 			work = false;
 			addLetterToPeriod(periode, letter);
-			System.out.println(keyPublic.substring(0,5)+ " :Lettre injectée : "+injection);
+//			System.out.println(keyPublic.substring(0,5)+ " :Lettre injectée : "+injection);
 		}
 		else {
-			System.out.println(keyPublic.substring(0,5)+" attend prochain tour");
+			System.out.println("AUTEUR "+identifiant+" attend prochain tour");
+
 		}
 	}
 	
@@ -205,7 +211,7 @@ public class Auteur implements Runnable{
 		map_letterPool.clear();
 		periode = obj.getInt("current_period");
 		JSONArray letterPool = obj.getJSONArray("letters");
-		System.out.println("nouveau pool de lettres : "+letterPool.toString());
+		System.out.println("AUTEUR "+identifiant+ "a recu nouveau pool de lettres : "+letterPool.toString());
 		
 		for(int i=letterPool.length()-1;i>=0;i--) {
 			JSONObject l = letterPool.getJSONArray(i).getJSONObject(1);
@@ -244,6 +250,8 @@ public class Auteur implements Runnable{
 		//TODO Correction hash signature
 		String s = Utils.hash(Utils.toBinaryString(l)+Long.toBinaryString(periode)+Utils.hash("")+keyPublic);
 		lettre.put("signature", signMessage(s));
+		System.out.println("AUTEUR "+identifiant+" inject letter "+ l);
+
 		return lettre;
 	}
 	
@@ -275,7 +283,7 @@ public class Auteur implements Runnable{
 		long taille = msg.length();
 		outchan.writeLong(taille);
 		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
-		System.out.println(keyPublic+" sur écoute");
+		System.out.println("AUTEUR "+identifiant+" sur écoute");
 		
 	}
 	/**
@@ -345,8 +353,9 @@ public class Auteur implements Runnable{
 				if(blockchain.isEmpty()) { blockchain.add(new Bloc(winner));}
 				else { 
 					blockchain.add(new Bloc(winner,blockchain.get(blockchain.size()-1)));}				
-				System.out.println("mot élu ("+score_max+" points) :"+winner );
-				
+				Word w = new Word(winner.toString());
+				System.out.println("mot élu par auteur "+identifiant+ "("+score_max+" points) :"+ w.toString() );
+
 				//calcul score des joueurs
 				updateScore_politician(winner.getString("politician"), score_max);
 				//calcul score auteurs
@@ -381,7 +390,17 @@ public class Auteur implements Runnable{
 			if(!scores_authors.containsKey(author)) { scores_authors.put(author, points);}
 			else {scores_authors.replace(author, points+scores_authors.get(author)) ;}
 		}
-		
+
+		System.out.println();
+		for(Entry<String,Integer> entry: scores_authors.entrySet()) {
+			String key = entry.getKey();
+			String auteur = key.substring(key.length()-6,key.length());
+			int score = entry.getValue();
+			System.out.print(" [ Auteur "+auteur+"a score : "+score + " ] ");
+			
+			
+		}
+		System.out.println();
 	}
 	
 	/**
@@ -466,7 +485,17 @@ public class Auteur implements Runnable{
 			System.out.println(p.substring(0,5)+" : "+scores_politicians.get(p));
 		}
 	}
-	
+	public void afficheFullWordrPool(JSONObject obj) throws JSONException {
+		List<Word> wordpool = new ArrayList<Word>();
+		JSONArray array  =  (JSONArray) obj.get("words");
+		for(int i = 0; i<array.length();i++){
+			wordpool.add(new Word(array.get(i).toString().substring(array.get(i).toString().indexOf("{"), 
+					array.get(i).toString().length()-1)));
+
+		}
+		System.out.println("full word pool "+wordpool);
+		
+	}
 
 	@Override
 	public void run() {
