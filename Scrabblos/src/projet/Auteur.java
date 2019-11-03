@@ -125,6 +125,9 @@ public class Auteur implements Runnable{
 		case "inject_word":
 			addWordToPeriod(periode, msg.getJSONObject("inject_word"));
 			break;
+		case "inject_letter":
+			obj = msg.getJSONObject("inject_letter");
+			addLetterToPeriod(obj.getInt("period"), obj);
 		
 		default:
 			System.out.println(msg);
@@ -179,10 +182,11 @@ public class Auteur implements Runnable{
 			outchan.writeLong(taille);
 			outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
 			work = false;
-			System.out.println("Lettre injectée : "+injection);
+			addLetterToPeriod(periode, letter);
+			System.out.println(keyPublic.substring(0,5)+ " :Lettre injectée : "+injection);
 		}
 		else {
-			System.out.println("Attend prochain tour");
+			System.out.println(keyPublic.substring(0,5)+" attend prochain tour");
 		}
 	}
 	
@@ -231,6 +235,7 @@ public class Auteur implements Runnable{
 		}
 		lettre.put("head",head);
 		lettre.put("author", keyPublic);
+		//TODO Correction hash signature
 		String s = Utils.hash(Utils.toBinaryString(l)+Long.toBinaryString(periode)+Utils.hash("")+keyPublic);
 		lettre.put("signature", signMessage(s));
 		return lettre;
@@ -408,6 +413,7 @@ public class Auteur implements Runnable{
 		boolean is_valid =true;
 		
 		//Vérifier que l'auteur n'a pas déjà injecté à la période
+		//TODO vérifier que la lettre n'est pas deja injectée
 		if(map_letterPool.containsKey(p)) {
 			JSONArray lettres = map_letterPool.get(p);
 			for(int i=0;i<lettres.length();i++) {
