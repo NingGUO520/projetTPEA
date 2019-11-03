@@ -28,7 +28,7 @@ public class MainTest {
 		Thread t3 = new Thread(aut3);
 		t3.start();
 		
-		Politicien2 pol = new Politicien2("127.0.0.1", 12345);
+		Politicien pol = new Politicien("127.0.0.1", 12345);
 		Thread t1 = new Thread(pol);
 		t1.start();
 	

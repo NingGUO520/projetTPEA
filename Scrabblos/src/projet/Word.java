@@ -14,6 +14,7 @@ public class Word {
 	private String head;
 	private String politician;
 	private String signature;
+	public int point=0;
 
 	public Word(String s) throws JSONException {
 		JSONObject object = new JSONObject(s);
@@ -26,11 +27,18 @@ public class Word {
 		this.politician = (String) map.get("politician");
 		this.signature = (String) map.get("signature");
 		setWordAsString();
+		setPoint();
 	}
 	
 	public void setWordAsString() {
 		for(Letter l : this.word) {
 			wordAsString+=l.letter;
+		}
+	}
+	
+	public void setPoint() {
+		for(char c : wordAsString.toCharArray()) {
+			this.point+= Points.getScore(c);
 		}
 	}
 	
@@ -46,4 +54,9 @@ public class Word {
 	public String toString() {
 		return this.wordAsString;
 	}
+
+	public int getPoint() {
+		return point;
+	}
+
 }

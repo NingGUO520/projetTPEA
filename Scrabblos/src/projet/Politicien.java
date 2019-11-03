@@ -13,7 +13,9 @@ import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.json.JSONArray;
@@ -33,6 +35,8 @@ public class Politicien implements Runnable{
 	private List<Letter> letters;
 	private List<String> allWords;
 	private List<Word> guessWords;
+	private List<Word> guessWordsOfLastPeriod;
+	private List<Bloc> blockchain;
 	
 	public Politicien(String url, int port) throws IOException, NoSuchAlgorithmException {
 		socket = new Socket(url, port);
@@ -41,6 +45,8 @@ public class Politicien implements Runnable{
 		id = ++politicienNumber;
 		letters = new ArrayList<Letter>();
 		guessWords = new ArrayList<Word>();
+		guessWordsOfLastPeriod = new ArrayList<Word>();
+		blockchain = new ArrayList<Bloc>();
 		allWords = Utils.readFile("dict/dict_100000_1_10.txt");
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
@@ -143,21 +149,35 @@ public class Politicien implements Runnable{
 		String signature = Utils.bytesToHex(s.sign());
 		return signature;
 	}
+	
+	public void addBlockchaine(int periode, String content) {
+		
+	}
+	
+	public void getLastPeriodeWord() throws JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
+		JSONObject obj = new JSONObject();
+		obj.put("get_wordpool_since",periode-1);
+		String msg = obj.toString();
+		long taille = msg.length();
+		outchan.writeLong(taille);
+		outchan.write(msg.getBytes("UTF-8"),0,(int)taille);
+		read();
+	}
+	
+	public String bestWordOfLastPeriod() {
+		return this.guessWordsOfLastPeriod.stream().max(Comparator.comparingInt(Word::getPoint)).get().wordAsString;
+	}
 
 
 	@Override
 	public void run() {
 		try {
 			while(true) {
-				Thread.sleep(1000);
 				initialzeLetters();
 				initialzeWords();
 				read();
 			}
 		} catch (IOException | JSONException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
 			// TODO Auto-generated catch block
@@ -184,6 +204,7 @@ public class Politicien implements Runnable{
 		case "next_turn":
 			periode = msg.getInt("next_turn");
 			System.out.println("Politicien "+id+" recoit : nouvelle periode : "+periode);
+			getLastPeriodeWord();
 			injectWord();
 			break;
 			
@@ -207,10 +228,15 @@ public class Politicien implements Runnable{
 			System.out.println("Politicien "+id+" recoit : Les mots injectes "+guessWords);
 			break;
 			
-		case "diff_letterpool": //TODO
-			break;
 		case "diff_wordpool":
-			msg.getJSONObject("diff_wordpool").getJSONObject("wordpool");
+			JSONObject diff_wordpool  =  (JSONObject)msg.getJSONObject("diff_wordpool").get("wordpool");;
+			JSONArray array2  =  (JSONArray) diff_wordpool.get("words");
+			guessWordsOfLastPeriod.removeAll(guessWordsOfLastPeriod);
+			for(int i = 0; i<array2.length();i++){
+				guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
+			}
+			System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
+			if(!guessWordsOfLastPeriod.isEmpty())  System.out.println("Best word "+bestWordOfLastPeriod());
 			break;
 
 		
