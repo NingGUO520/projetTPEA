@@ -196,10 +196,10 @@ public class Auteur implements Runnable{
 			addLetterToPeriod(periode, letter);
 //			System.out.println(keyPublic.substring(0,5)+ " :Lettre injectée : "+injection);
 		}
-		else {
-			System.out.println("AUTEUR "+identifiant+" attend prochain tour");
-
-		}
+//		else {
+//			System.out.println("AUTEUR "+identifiant+" attend prochain tour");
+//
+//		}
 	}
 	
 	/**
@@ -250,7 +250,7 @@ public class Auteur implements Runnable{
 		//TODO Correction hash signature
 		String s = Utils.hash(Utils.toBinaryString(l)+Long.toBinaryString(periode)+Utils.hash("")+keyPublic);
 		lettre.put("signature", signMessage(s));
-		System.out.println("AUTEUR "+identifiant+" inject letter "+ l);
+		System.out.println("AUTEUR "+identifiant+" inject letter "+ l+ " en periode "+periode);
 
 		return lettre;
 	}
@@ -339,12 +339,12 @@ public class Auteur implements Runnable{
 	public void chooseWord(int period) throws JSONException, NoSuchAlgorithmException {
 		
 		if(map_wordPool.containsKey(period)) {
-			System.out.println("choose "+period);
-			int taille =map_wordPool.get(period).length();
+			System.out.println("choose word from periode  "+period);
+			int taille = map_wordPool.get(period).length();
 			int score_max =0;
 			JSONObject winner = null;
 			for(int i=0;i<taille;i++) {
-				JSONObject o =map_wordPool.get(period).getJSONObject(i);
+				JSONObject o = map_wordPool.get(period).getJSONObject(i);
 				JSONArray letters = o.getJSONArray("word");
 				int score = Points.score_mot(letters);
 				if(score > score_max) { score_max = score; winner = o;}					

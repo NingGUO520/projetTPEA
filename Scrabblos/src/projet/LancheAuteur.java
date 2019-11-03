@@ -14,7 +14,7 @@ public class LancheAuteur {
 		Thread t = new Thread(aut);
 		t.start();
 		
-		
+//		
 		Socket s1 = new Socket("127.0.0.1", 12345);
 		Auteur aut2 = new Auteur(s1);
 		Thread t2 = new Thread(aut2);
