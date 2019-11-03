@@ -13,9 +13,6 @@ public class LanchePoliticien {
 		Thread t2 = new Thread(pol1);
 		t2.start();
 		
-		Politicien pol2 = new Politicien("127.0.0.1", 12345);
-		Thread t3 = new Thread(pol2);
-		t3.start();
 	
 	}
 

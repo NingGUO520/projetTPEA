@@ -110,7 +110,7 @@ public class Auteur implements Runnable{
 			chooseWord(periode);
 			periode = msg.getInt("next_turn");
 			map_wordPool.put(periode, new JSONArray());
-			System.out.println("nouvelle periode : "+periode);
+			System.out.println("AUTEUR "+identifiant+" est en nouvelle periode : "+periode);
 			work = true;
 			break;
 		case "letters_bag":
