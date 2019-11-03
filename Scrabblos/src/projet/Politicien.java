@@ -116,7 +116,8 @@ public class Politicien implements Runnable{
 	public JSONObject getWord(String w) throws NoSuchAlgorithmException, UnsupportedEncodingException, InvalidKeyException, JSONException, SignatureException {
 		JSONObject word = new JSONObject();
 		word.put("word", getLettreOfWord(w));
-		word.put("head", Utils.hash(""));
+		if(blockchain.isEmpty()) word.put("head", Utils.hash(""));
+		else word.put("head", blockchain.get(blockchain.size()-1).getHash());
 		word.put("politician", keyPublic);
 		String s = Utils.hash(Utils.toBinaryString(getLettreOfWord(w).toString())+Utils.hash("")+keyPublic);
 		word.put("signature", signMessage(s));
@@ -150,8 +151,9 @@ public class Politicien implements Runnable{
 		return signature;
 	}
 	
-	public void addBlockchaine(int periode, String content) {
-		
+	public void addBlockchaine(int periode, JSONObject content) throws NoSuchAlgorithmException {
+		if(blockchain.isEmpty()) blockchain.add(new Bloc(content));
+		else blockchain.add(new Bloc(content,blockchain.get(blockchain.size()-1)));
 	}
 	
 	public void getLastPeriodeWord() throws JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
@@ -164,8 +166,8 @@ public class Politicien implements Runnable{
 		read();
 	}
 	
-	public String bestWordOfLastPeriod() {
-		return this.guessWordsOfLastPeriod.stream().max(Comparator.comparingInt(Word::getPoint)).get().wordAsString;
+	public JSONObject bestWordOfLastPeriod() {
+		return this.guessWordsOfLastPeriod.stream().max(Comparator.comparingInt(Word::getPoint)).get().wordAsObject;
 	}
 
 
@@ -236,7 +238,7 @@ public class Politicien implements Runnable{
 				guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
 			}
 			System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
-			if(!guessWordsOfLastPeriod.isEmpty())  System.out.println("Best word "+bestWordOfLastPeriod());
+			if(!guessWordsOfLastPeriod.isEmpty())  addBlockchaine(periode, bestWordOfLastPeriod());
 			break;
 
 		
