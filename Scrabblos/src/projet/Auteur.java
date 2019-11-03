@@ -14,6 +14,8 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +101,7 @@ public class Auteur implements Runnable{
 		case "next_turn":
 			chooseWord(periode);
 			periode = msg.getInt("next_turn");
+			map_wordPool.put(periode, new JSONArray());
 			System.out.println("nouvelle periode : "+periode);
 			work = true;
 			break;
@@ -123,11 +126,14 @@ public class Auteur implements Runnable{
 			break;
 			
 		case "inject_word":
-			addWordToPeriod(periode, msg.getJSONObject("inject_word"));
+			System.out.println("inject word");
+			obj = msg.getJSONObject("inject_word");
+			addWordToPeriod(periode,obj);
 			break;
 		case "inject_letter":
 			obj = msg.getJSONObject("inject_letter");
 			addLetterToPeriod(obj.getInt("period"), obj);
+			break;
 		
 		default:
 			System.out.println(msg);
@@ -323,7 +329,9 @@ public class Auteur implements Runnable{
 	 * @throws NoSuchAlgorithmException 
 	 */
 	public void chooseWord(int period) throws JSONException, NoSuchAlgorithmException {
+		
 		if(map_wordPool.containsKey(period)) {
+			System.out.println("choose "+period);
 			int taille =map_wordPool.get(period).length();
 			int score_max =0;
 			JSONObject winner = null;
@@ -401,6 +409,7 @@ public class Auteur implements Runnable{
 			if(!map_wordPool.containsKey(p)) { map_wordPool.put(p, new JSONArray()); }
 			map_wordPool.get(p).put(word);
 		}
+		
 	}
 	
 	/**
@@ -427,6 +436,36 @@ public class Auteur implements Runnable{
 			map_letterPool.get(p).put(l);
 		}
 	}
+	/**
+	 * Calcul des scores pour afficher le classement des auteurs et politiciens
+	 */
+	public void winner() {
+		List<String> authors = new ArrayList<String>(scores_authors.keySet());
+		Collections.sort(authors, new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				return scores_authors.get(o1).compareTo(scores_authors.get(o2));
+			}
+		});
+		System.out.println("Score des auteurs :");
+		for(String a :authors) {
+			System.out.println(a.substring(0,5)+" : "+scores_authors.get(a));
+		}
+		
+		List<String> politicians = new ArrayList<String>(scores_politicians.keySet());
+		Collections.sort(politicians, new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				return scores_politicians.get(o1).compareTo(scores_politicians.get(o2));
+			}
+		});
+		System.out.println("Score des politiciens :");
+		for(String p :politicians) {
+			System.out.println(p.substring(0,5)+" : "+scores_politicians.get(p));
+		}
+	}
 	
 
 	@Override
@@ -435,13 +474,14 @@ public class Auteur implements Runnable{
 			register();
 			read();
 			listen();
+			inject_letter();
 			while(true) {
-				inject_letter();
 				read();
+				inject_letter();
 			}
 		} catch (JSONException | IOException | InvalidKeyException | NoSuchAlgorithmException | SignatureException | InterruptedException e) {
 			// TODO Déclarer les vainqueurs
-			e.printStackTrace();
+			winner();
 		}
 		
 		
