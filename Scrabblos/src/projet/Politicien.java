@@ -144,7 +144,6 @@ public class Politicien implements Runnable{
 			getPeriodeWord(periode);
 			setDictionary();
 			List<String> listOfWords = checkWordIfExist();
-			initialzeWords();
 			listOfWords = checkWordIfAlreadyInPool(listOfWords);
 			if(!listOfWords.isEmpty()){
 				System.out.println("Politicien "+id+" inject word "+listOfWords.get(0));
@@ -252,11 +251,11 @@ public class Politicien implements Runnable{
 	public void printWinner() {
 		Map<String, Integer> politicien = Utils.sortByValue(scores_politicians, false);
 		Map<String, Integer> author = Utils.sortByValue(scores_authors, false);
-		System.out.println("Politician's score");
+		System.out.println("Politician's score "+id);
 		for(String key: politicien.keySet()) {
 			System.out.println("Politician "+key.substring(0,5)+" :" +politicien.get(key));
 		}
-		System.out.println("Author's score");
+		System.out.println("Author's score "+id);
 		for(String key: author.keySet()) {
 			System.out.println("Author "+key.substring(0,5)+" :" +author.get(key));
 		}
@@ -291,6 +290,11 @@ public class Politicien implements Runnable{
 			periode = msg.getInt("next_turn");
 			System.out.println("Politicien "+id+" est en nouvelle periode : "+periode);
 			work = true;
+			if(!guessWordsOfLastPeriod.isEmpty()) {
+				Word bestWord = bestWordOfLastPeriod();
+				addBlockchaine(periode, bestWord.wordAsObject);
+				score(bestWord);
+			}
 			break;
 			
 		case "full_letterpool":
@@ -325,11 +329,7 @@ public class Politicien implements Runnable{
 					guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
 				}
 				System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
-				if(!guessWordsOfLastPeriod.isEmpty()) {
-					Word bestWord = bestWordOfLastPeriod();
-					addBlockchaine(periode, bestWord.wordAsObject);
-					score(bestWord);
-				}
+				
 			}
 			else {
 				for(int i = 0; i<array2.length();i++){
