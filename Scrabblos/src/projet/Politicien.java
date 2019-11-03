@@ -24,6 +24,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import projet.Utils.Bloc;
+import projet.Utils.Letter;
+import projet.Utils.Points;
+import projet.Utils.Utils;
+import projet.Utils.Word;
+
 public class Politicien implements Runnable{
     
     private Socket socket;
