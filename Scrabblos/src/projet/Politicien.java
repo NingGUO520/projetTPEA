@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 import org.json.JSONArray;
@@ -33,8 +34,9 @@ public class Politicien implements Runnable{
 	private int periode;
 	private KeyPair pair;
 	private String keyPublic;
+	private Random random = new Random();
 	private List<Letter> letters;
-	private List<String> allWords;
+	private List<String> dictionary;
 	private List<Word> guessWords;
 	private List<Word> guessWordsOfLastPeriod;
 	private List<Bloc> blockchain;
@@ -52,7 +54,7 @@ public class Politicien implements Runnable{
 		blockchain = new ArrayList<Bloc>();
 		scores_authors = new HashMap<String, Integer>();
 		scores_politicians = new HashMap<String, Integer>();
-		allWords = Utils.readFile("dict/dict_100000_1_10.txt");
+		dictionary = Utils.readFile("dict/dict_100000_1_10.txt");
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
 		keyPublic = Utils.getHexKey(pair.getPublic());
@@ -60,7 +62,7 @@ public class Politicien implements Runnable{
         System.out.println("------------------------");
 	}
 	
-	public synchronized boolean initialzeLetters() throws IOException, JSONException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
+	public synchronized boolean initialzeLetters() throws IOException, JSONException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, InterruptedException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_letterpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -71,7 +73,7 @@ public class Politicien implements Runnable{
 		return true;
 	}
 	
-	public synchronized boolean initialzeWords() throws IOException, JSONException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
+	public synchronized boolean initialzeWords() throws IOException, JSONException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, InterruptedException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_full_wordpool",JSONObject.NULL);
 		String msg = obj.toString();
@@ -85,7 +87,7 @@ public class Politicien implements Runnable{
 	
 	public List<String> checkWordIfExist(){
 		List<String> guessWordsAsString = Word.ListOfWordsToListOfString(guessWords);
-		return allWords.stream().filter(word->!guessWordsAsString.contains(word))
+		return dictionary.stream().filter(word->!guessWordsAsString.contains(word))
 				.filter(word -> check(word))
 				.filter(word -> oneLettreForEachAuthor(word))
 				.collect(Collectors.toList());
@@ -104,7 +106,8 @@ public class Politicien implements Runnable{
 		return letters.stream().filter(l -> l.letter.equals(c)).map(l -> l.author).findAny().get();
 	}
 	
-	public synchronized boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException {
+	public synchronized boolean injectWord() throws NoSuchAlgorithmException, IOException, InvalidKeyException, JSONException, SignatureException, InterruptedException {
+		Thread.sleep(5000+random.nextInt(2000));
 		List<String> listOfWords = checkWordIfExist();
 		if(!listOfWords.isEmpty()){
 			System.out.println("Politicien "+id+" inject word "+listOfWords);
@@ -161,7 +164,7 @@ public class Politicien implements Runnable{
 		else blockchain.add(new Bloc(content,blockchain.get(blockchain.size()-1)));
 	}
 	
-	public void getLastPeriodeWord() throws JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException {
+	public void getLastPeriodeWord() throws JSONException, IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, InterruptedException {
 		JSONObject obj = new JSONObject();
 		obj.put("get_wordpool_since",periode-1);
 		String msg = obj.toString();
@@ -191,6 +194,31 @@ public class Politicien implements Runnable{
 			else scores_authors.replace(l.author, Points.getScore(l.letter.charAt(0))+scores_authors.get(l.author));
 		}
 	}
+	
+	public void setDictionary() throws IOException {
+		if(5<letters.size() && letters.size() <= 15) {
+			dictionary.addAll(Utils.readFile("dict/dict_100000_5_15.txt"));
+		}
+		else if(25<letters.size() && letters.size() <= 50) {
+			dictionary.addAll(Utils.readFile("dict/dict_100000_25_75.txt"));
+		}
+		else if(50<letters.size() && letters.size() <= 200) {
+			dictionary.addAll(Utils.readFile("dict/dict_100000_50_200.txt"));
+		}
+	}
+	
+	public void printWinner() {
+		Map<String, Integer> politicien = Utils.sortByValue(scores_politicians, false);
+		Map<String, Integer> author = Utils.sortByValue(scores_authors, false);
+		System.out.println("Politician's score");
+		for(String key: politicien.keySet()) {
+			System.out.println("Politician "+key.substring(0,5)+" :" +politicien.get(key));
+		}
+		System.out.println("Author's score");
+		for(String key: author.keySet()) {
+			System.out.println("Author "+key.substring(0,5)+" :" +author.get(key));
+		}
+	}
 
 
 	@Override
@@ -201,22 +229,13 @@ public class Politicien implements Runnable{
 				initialzeWords();
 				read();
 			}
-		} catch (IOException | JSONException e) {
-			e.printStackTrace();
-		} catch (InvalidKeyException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (NoSuchAlgorithmException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (SignatureException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (IOException | InterruptedException | JSONException | InvalidKeyException | NoSuchAlgorithmException | SignatureException e) {
+			printWinner();
 		}
 		
 	}
 	
-	public void read() throws IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, JSONException {
+	public void read() throws IOException, InvalidKeyException, NoSuchAlgorithmException, SignatureException, JSONException, InterruptedException {
 		long taille_ans = inchan.readLong();
 		byte [] cbuf = new byte[(int)taille_ans];
 		inchan.read(cbuf, 0, (int)taille_ans);
@@ -229,6 +248,7 @@ public class Politicien implements Runnable{
 			periode = msg.getInt("next_turn");
 			System.out.println("Politicien "+id+" recoit : nouvelle periode : "+periode);
 			getLastPeriodeWord();
+			setDictionary();
 			injectWord();
 			break;
 			
