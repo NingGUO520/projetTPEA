@@ -9,11 +9,11 @@ import org.json.JSONObject;
 
 public class Word {
 
-	private List<Letter> word;
+	public List<Letter> word;
 	public String wordAsString="";
 	public JSONObject wordAsObject;
 	private String head;
-	private String politician;
+	public String politician;
 	private String signature;
 	public int point=0;
 

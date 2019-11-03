@@ -6,11 +6,11 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 public class Letter {
-	String letter;
-	int period;
-	String head;
-	String author;
-	String signature;
+	public String letter;
+	public int period;
+	public String head;
+	public String author;
+	public String signature;
 	
 	public Letter(String s) throws JSONException {
 		JSONObject object = new JSONObject(s);

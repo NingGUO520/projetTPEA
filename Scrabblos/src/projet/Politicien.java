@@ -14,6 +14,7 @@ import java.security.SignatureException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +38,8 @@ public class Politicien implements Runnable{
 	private List<Word> guessWords;
 	private List<Word> guessWordsOfLastPeriod;
 	private List<Bloc> blockchain;
+	private Map<String,Integer> scores_authors;
+	private Map<String,Integer> scores_politicians;
 	
 	public Politicien(String url, int port) throws IOException, NoSuchAlgorithmException {
 		socket = new Socket(url, port);
@@ -47,6 +50,8 @@ public class Politicien implements Runnable{
 		guessWords = new ArrayList<Word>();
 		guessWordsOfLastPeriod = new ArrayList<Word>();
 		blockchain = new ArrayList<Bloc>();
+		scores_authors = new HashMap<String, Integer>();
+		scores_politicians = new HashMap<String, Integer>();
 		allWords = Utils.readFile("dict/dict_100000_1_10.txt");
 		KeyPairGenerator kp = KeyPairGenerator.getInstance("DSA");
 		pair = kp.generateKeyPair();
@@ -166,8 +171,25 @@ public class Politicien implements Runnable{
 		read();
 	}
 	
-	public JSONObject bestWordOfLastPeriod() {
-		return this.guessWordsOfLastPeriod.stream().max(Comparator.comparingInt(Word::getPoint)).get().wordAsObject;
+	public Word bestWordOfLastPeriod() {
+		return this.guessWordsOfLastPeriod.stream().max(Comparator.comparingInt(Word::getPoint)).get();
+	}
+	
+	public void score(Word word) {
+		scorePolitician(word);
+		scoreAuthor(word.word);
+	}
+	
+	public void scorePolitician(Word word) {
+		if(!scores_politicians.containsKey(word.politician)) scores_politicians.put(word.politician, word.point);
+		else scores_politicians.replace(word.politician, word.point+scores_politicians.get(word.politician));
+	}
+	
+	public void scoreAuthor(List<Letter> lettres) {
+		for(Letter l : lettres) {
+			if(!scores_authors.containsKey(l.author)) scores_authors.put(l.author, Points.getScore(l.letter.charAt(0)));
+			else scores_authors.replace(l.author, Points.getScore(l.letter.charAt(0))+scores_authors.get(l.author));
+		}
 	}
 
 
@@ -238,7 +260,11 @@ public class Politicien implements Runnable{
 				guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
 			}
 			System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
-			if(!guessWordsOfLastPeriod.isEmpty())  addBlockchaine(periode, bestWordOfLastPeriod());
+			if(!guessWordsOfLastPeriod.isEmpty()) {
+				Word bestWord = bestWordOfLastPeriod();
+				addBlockchaine(periode, bestWord.wordAsObject);
+				score(bestWord);
+			}
 			break;
 
 		
