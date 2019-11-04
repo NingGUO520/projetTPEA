@@ -99,12 +99,10 @@ public class Politicien implements Runnable{
 	 */
 	public List<String> checkWordIfAlreadyInPool( List<String> words){
 		List<String> result = new ArrayList<String>() ;
-		
 		for(String w : words) {
-			if(!guessWords.contains(w)) {
+			if(!guessWords.stream().map(wo -> wo.wordAsString).collect(Collectors.toList()).contains(w)) {
 				result.add(w);
 			}
-			
 		}
 		return result;
 	}
@@ -144,9 +142,9 @@ public class Politicien implements Runnable{
 			getPeriodeWord(periode);
 			setDictionary();
 			List<String> listOfWords = checkWordIfExist();
-			listOfWords = checkWordIfAlreadyInPool(listOfWords);
 			if(!listOfWords.isEmpty()){
-				System.out.println("Politicien "+id+" inject word "+listOfWords.get(0));
+				System.out.println("not exicte on "+guessWords);
+				System.out.println("Politicien "+id+" inject word "+listOfWords.stream().findAny().get());
 				JSONObject injection = new JSONObject();
 				injection.put("inject_word", getWord(listOfWords.get(0)));
 				String msg = injection.toString();
@@ -290,11 +288,6 @@ public class Politicien implements Runnable{
 			periode = msg.getInt("next_turn");
 			System.out.println("Politicien "+id+" est en nouvelle periode : "+periode);
 			work = true;
-			if(!guessWordsOfLastPeriod.isEmpty()) {
-				Word bestWord = bestWordOfLastPeriod();
-				addBlockchaine(periode, bestWord.wordAsObject);
-				score(bestWord);
-			}
 			break;
 			
 		case "full_letterpool":
@@ -329,13 +322,19 @@ public class Politicien implements Runnable{
 					guessWordsOfLastPeriod.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
 				}
 				System.out.println("Politicien "+id+" recoit : Les mots injectes de la période précédente "+guessWordsOfLastPeriod);
-				
+				if(!guessWordsOfLastPeriod.isEmpty()) {
+					Word bestWord = bestWordOfLastPeriod();
+					addBlockchaine(periode, bestWord.wordAsObject);
+					score(bestWord);
+				}
 			}
 			else {
+				List<Word> word = new ArrayList<Word>();
 				for(int i = 0; i<array2.length();i++){
-					guessWords.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
+					word.add(new Word(array2.get(i).toString().substring(array2.get(i).toString().indexOf("{"), array2.get(i).toString().length()-1)));
 				}
-				System.out.println("Politicien "+id+" recoit : Les mots injectes de cette période "+guessWords);
+				guessWords.addAll(word);
+				System.out.println("Politicien "+id+" recoit : Les mots injectes de cette période "+word);
 			}
 			break;
 
